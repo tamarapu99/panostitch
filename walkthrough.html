@@ -1,0 +1,258 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>PanoStitch | 360 Walkthrough</title>
+
+    <!-- Pannellum -->
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/pannellum@2.5.7/build/pannellum.css"
+    />
+
+    <script
+        src="https://cdn.jsdelivr.net/npm/pannellum@2.5.7/build/pannellum.js"
+        defer
+    ></script>
+
+    <style>
+        :root {
+            --bg: #0b1020;
+            --panel: #151d30;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --accent: #38bdf8;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, system-ui, sans-serif;
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            height: 68px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            background: var(--panel);
+            border-bottom: 1px solid #263247;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            display: grid;
+            place-items: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 9px;
+            background: var(--accent);
+            color: #082f49;
+            font-weight: 800;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 17px;
+        }
+
+        .subtitle {
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .viewer-status {
+            color: #86efac;
+            font-size: 12px;
+        }
+
+        main {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+        }
+
+        #panorama {
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
+
+        .viewer-label {
+            position: absolute;
+            z-index: 5;
+            top: 18px;
+            left: 18px;
+            padding: 10px 14px;
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 8px;
+            background: rgba(10,15,25,.75);
+            color: white;
+            font-size: 12px;
+            pointer-events: none;
+        }
+
+        .loading {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            display: grid;
+            place-items: center;
+            background: #080c15;
+            color: var(--muted);
+        }
+
+        .loading.hidden {
+            display: none;
+        }
+
+        .error {
+            max-width: 420px;
+            padding: 24px;
+            color: #fca5a5;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 600px) {
+            header {
+                height: 60px;
+                padding: 0 14px;
+            }
+
+            .viewer-label {
+                top: 12px;
+                left: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="app">
+
+    <header>
+        <div class="brand">
+            <div class="brand-icon">P</div>
+
+            <div>
+                <h1>PanoStitch</h1>
+                <div class="subtitle">Immersive Walkthrough</div>
+            </div>
+        </div>
+
+        <div class="viewer-status" id="status">
+            Initializing viewer
+        </div>
+    </header>
+
+    <main>
+        <div id="panorama"></div>
+
+        <div class="viewer-label">
+            Drag to look around · Pinch / scroll to zoom · Auto-spins when idle
+        </div>
+
+        <div class="loading" id="loading">
+            Loading panorama...
+        </div>
+    </main>
+
+</div>
+
+<script>
+    // Full 360 x 180 equirectangular from pose_stitch.py.
+    // Try the 8K render with: walkthrough.html?img=output_images/test_8k.jpg
+    const DEFAULT_PANORAMA = "output_images/test_v2.jpg";
+
+    window.addEventListener("load", () => {
+        const loading = document.getElementById("loading");
+        const status = document.getElementById("status");
+        const panoramaPath = new URLSearchParams(location.search).get("img") || DEFAULT_PANORAMA;
+
+        const fail = (msg, detail) => {
+            loading.classList.remove("hidden");
+            loading.innerHTML = '<div class="error">' + msg + "</div>";
+            status.textContent = "Viewer error";
+            console.error(msg, detail || "");
+        };
+
+        if (typeof pannellum === "undefined") {
+            fail("Pannellum could not load. Check your internet connection and reload the page.");
+            return;
+        }
+
+        if (location.protocol === "file:") {
+            status.textContent = "Tip: serve with python -m http.server";
+        }
+
+        const viewer = pannellum.viewer("panorama", {
+            type: "equirectangular",
+            panorama: panoramaPath,
+            autoLoad: true,
+
+            // Full sphere
+            haov: 360,
+            vaov: 180,
+
+            yaw: 0,
+            pitch: 0,
+            hfov: 100,
+            minHfov: 40,
+            maxHfov: 120,
+
+            // Gentle spin that starts after 4 s without interaction and stops on touch/drag
+            autoRotate: -2,
+            autoRotateInactivityDelay: 4000,
+            autoRotateStopDelay: 0,
+
+            compass: true,
+            showControls: true,
+            showFullscreenCtrl: true,
+            mouseZoom: true,
+            keyboardZoom: true,
+            draggable: true,
+            backgroundColor: [0, 0, 0],
+
+            hotSpots: [
+                { pitch: 0, yaw: 5, type: "info", text: "Living Room" }
+            ]
+        });
+
+        viewer.on("load", () => {
+            loading.classList.add("hidden");
+            status.textContent = "360° panorama ready";
+        });
+
+        viewer.on("error", (error) => {
+            fail("Unable to display the panorama:<br>" + panoramaPath + "<br>Check the path and serve the folder over http.", error);
+        });
+    });
+</script>
+
+</body>
+</html>
